@@ -1,0 +1,23 @@
+server:
+  port: 9933
+spring:
+  application:
+    name: data-agent
+  profiles:
+    active: private
+  datasource:
+    url: jdbc:postgresql://localhost:5432/data_agent_tutorial
+    username: postgres
+    password: HmSm7WmpPWJtCB66
+    driver-class-name: org.postgresql.Driver
+jimmer:
+  dialect: org.babyfish.jimmer.sql.dialect.PostgresDialect  # sql方言
+  show-sql: true # 是否展示执行的sql
+  pretty-sql: true # 是否整理sql 默认展示的为紧凑的sql true则会被整理
+  language: kotlin
+  client:  # jimmer自动生成客户端api相关配置
+    ts:
+      path: /ts.zip
+    openapi:
+      path: /openapi
+      ui-path: /openapi-ui
