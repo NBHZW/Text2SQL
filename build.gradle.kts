@@ -14,14 +14,19 @@ jimmer {
     version = "0.10.6"
 }
 
+val KOTLIN_LOGGING_VERSION = "8.0.01"
+val A2A_SDK_VERSION = "0.3.2.Final"
+
+
 // 依赖管理
 dependencies {
-    implementation("io.github.oshai:kotlin-logging-jvm:8.0.01")
+    implementation("io.github.oshai:kotlin-logging-jvm:$KOTLIN_LOGGING_VERSION")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.postgresql:postgresql")
+    implementation("io.github.a2asdk:a2a-java-sdk-transport-jsonrpc:$A2A_SDK_VERSION") // a2a协议
 }
 
 // 测试工具管理 默认使用 JUnit5
