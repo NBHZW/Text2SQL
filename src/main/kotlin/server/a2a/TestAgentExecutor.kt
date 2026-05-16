@@ -65,7 +65,7 @@ class TestAgentExecutor: AgentExecutor {
         taskUpdater.addArtifact(
             listOf(TextPart("hello from a2a: $text")),
             "1",
-            "TEST_HELLO_NODE",
+            "TOY_HELLO_NODE",
             mapOf("outputType" to "GRAPH_NODE_STREAMING")
         )
         taskUpdater.complete()

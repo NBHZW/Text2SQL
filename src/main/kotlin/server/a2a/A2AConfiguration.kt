@@ -55,6 +55,7 @@ open class A2AConfiguration {
         return AgentCard.Builder()
             .name("sqlAgent")
             .description("专业的SQL生成Agent")
+            .protocolVersion("0.3.0")
             .defaultInputModes(listOf("text/plain"))
             .defaultOutputModes(listOf("text/plain"))
             .capabilities(
@@ -75,6 +76,7 @@ open class A2AConfiguration {
                 )
             )
             .url(A2A_JSONRPC_URL)
+            .preferredTransport(TransportProtocol.JSONRPC.asString())
             .additionalInterfaces(listOf(AgentInterface(TransportProtocol.JSONRPC.asString(), A2A_JSONRPC_URL)))
             .version("1.0")
             .build()
