@@ -10,6 +10,14 @@ spring:
     username: postgres
     password: HmSm7WmpPWJtCB66
     driver-class-name: org.postgresql.Driver
+  ai:
+    openai:
+      base-url: https://api.aicodemirror.com/api/codex/backend-api/codex
+      api-key: sk-ant-api03-Hrnq5GCsTawUfzHFMwQ0YOd9EVwh9q_wQsX2fgc8rZIHs_3UaBpXNiNGWUoD1T0o_exbhb_1Coc4DaToNnA6KA
+      chat:
+        options:
+          model: gpt-5.5
+
 jimmer:
   dialect: org.babyfish.jimmer.sql.dialect.PostgresDialect  # sql方言
   show-sql: true # 是否展示执行的sql

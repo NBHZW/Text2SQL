@@ -21,6 +21,9 @@ val A2A_SDK_VERSION = "0.3.2.Final"
 // 依赖管理
 dependencies {
     implementation("io.github.oshai:kotlin-logging-jvm:$KOTLIN_LOGGING_VERSION")
+    implementation(platform("org.springframework.ai:spring-ai-bom:1.1.2"))
+    implementation("org.springframework.ai:spring-ai-starter-model-openai")
+    implementation("com.alibaba.cloud.ai:spring-ai-alibaba-graph-core:1.1.2.2")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")

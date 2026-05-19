@@ -15,60 +15,65 @@
 
 package com.zealsinger.kotlin.agent.server.a2a
 
+import com.alibaba.cloud.ai.graph.NodeOutput
+import com.alibaba.cloud.ai.graph.StateGraph
+import com.alibaba.cloud.ai.graph.streaming.OutputType
+import com.alibaba.cloud.ai.graph.streaming.StreamingOutput
 import io.a2a.server.agentexecution.AgentExecutor
 import io.a2a.server.agentexecution.RequestContext
 import io.a2a.server.events.EventQueue
 import io.a2a.server.tasks.TaskUpdater
+import io.a2a.spec.DataPart
 import io.a2a.spec.TextPart
 import org.springframework.stereotype.Component
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 测试Agent执行器实现类
- * 
+ *
  * 该类实现了A2A框架的AgentExecutor接口，提供了一个简单的测试Agent执行逻辑。
  * 主要用于验证A2A框架的基本功能和开发调试。
- * 
+ *
  * @Component Spring组件注解，使该类被Spring容器管理
  * @see AgentExecutor A2A规范定义的Agent执行器接口
  */
 @Component
-class TestAgentExecutor: AgentExecutor {
-    /**
-     * 执行Agent任务的核心方法
-     * 
-     * 该方法处理客户端发送的请求，执行具体的业务逻辑，并通过TaskUpdater更新任务状态。
-     * 在A2A架构中，这是Agent执行器最重要的方法，负责实际的业务处理。
-     * 
-     * @param context 请求上下文，包含客户端请求的完整信息：
-     *        - message: 请求消息对象
-     *        - parts: 消息内容部分列表
-     *        - task: 关联的任务对象
-     *        - agentCard: Agent卡片信息
-     * @param eventQueue 事件队列，用于异步事件处理和通知
-     * 
-     * @implSpec 该实现执行以下步骤：
-     * 1. 创建TaskUpdater实例用于更新任务状态
-     * 2. 从请求上下文中提取文本输入
-     * 3. 构建响应文本（添加问候语前缀）
-     * 4. 通过addArtifact方法添加输出工件
-     * 5. 调用complete()方法标记任务完成
-     * 
-     * @see TaskUpdater 用于更新任务状态和输出的工具类
-     * @see TextPart 文本内容部分的封装类
-     */
+class TestAgentExecutor(private val stateGraph: StateGraph): AgentExecutor {
     override fun execute(
         context: RequestContext?,
         eventQueue: EventQueue?
     ) {
         val taskUpdater = TaskUpdater(context, eventQueue)
+        val artifactNum = AtomicInteger()
+        fun handlerNodeOutput(nodeOutput: NodeOutput) {
+            if (nodeOutput is StreamingOutput<*>) {
+                when (nodeOutput.outputType) {
+                    OutputType.GRAPH_NODE_STREAMING -> {
+                        val text = nodeOutput.message()?.text?.takeIf { it.isNotEmpty() } ?: return
+                        taskUpdater.addArtifact(
+                            listOf(TextPart(text)),
+                            artifactNum.incrementAndGet().toString(),
+                            nodeOutput.node(),
+                            mapOf("outputType" to nodeOutput.outputType)
+                        )
+                    }
+
+                    OutputType.GRAPH_NODE_FINISHED -> taskUpdater.addArtifact(
+                        listOf(DataPart(nodeOutput.state().data())),
+                        artifactNum.incrementAndGet().toString(),
+                        nodeOutput.node(),
+                        mapOf("outputType" to nodeOutput.outputType)
+                    )
+
+                    else -> {}
+                }
+            }
+        }
         val text = ((context?.message?.parts?.first { it is TextPart }) as TextPart).text
-        taskUpdater.addArtifact(
-            listOf(TextPart("hello from a2a: $text")),
-            "1",
-            "TOY_HELLO_NODE",
-            mapOf("outputType" to "GRAPH_NODE_STREAMING")
-        )
-        taskUpdater.complete()
+        stateGraph.compile().stream(mapOf("input" to text))
+            .doOnNext(::handlerNodeOutput)
+            .doOnComplete(taskUpdater::complete)
+            .blockLast()
     }
 
     /**
@@ -97,27 +102,4 @@ class TestAgentExecutor: AgentExecutor {
         return
     }
 
-    /*
-     * TestAgentExecutor 架构总结：
-     * 
-     * 该测试执行器在A2A架构中扮演以下关键角色：
-     * 
-     * 1. 请求处理层：接收RequestContext和EventQueue，作为A2A协议的入口点
-     * 2. 业务逻辑层：实现具体的Agent功能（文本处理）
-     * 3. 状态管理层：通过TaskUpdater与任务存储交互，更新任务状态
-     * 4. 输出生成层：创建TextPart输出工件，支持流式响应
-     * 5. 生命周期管理：提供execute和cancel方法管理任务生命周期
-     * 
-     * 该实现遵循A2A规范的核心原则：
-     * - 基于事件驱动的异步处理
-     * - 任务状态的显式管理
-     * - 标准化的输入输出格式
-     * - 可扩展的插件架构
-     * 
-     * 注意：这是一个测试实现，生产环境需要：
-     * - 更复杂的业务逻辑
-     * - 完整的错误处理
-     * - 资源管理和清理
-     * - 性能优化和监控
-     */
 }
