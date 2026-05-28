@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm") version "2.3.0"
     id("com.google.devtools.ksp") version "2.3.0"
-    id("org.springframework.boot") version "3.2.5"
+    id("org.springframework.boot") version "3.5.9"
     id("tech.argonariod.gradle-plugin-jimmer") version "latest.release"
 }
 apply(plugin = "io.spring.dependency-management")
