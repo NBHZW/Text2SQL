@@ -12,11 +12,17 @@ import org.springframework.stereotype.Component
 class TestTravelPlanNode(private val chatModel: ChatModel) : NodeAction{
     override fun apply(state: OverAllState): Map<String, Any> {
         val input = state.value(TestGraphSpec.StateKey.INPUT, "")
+        val feedback = state.value(TestGraphSpec.StateKey.CONFIRMATION_FEEDBACK, "").trim()
+        val feedbackPrompt = if (feedback.isNotEmpty()) {
+            "\n用户在人工确认阶段补充了要求：$feedback"
+        } else {
+            ""
+        }
         // 这里先返回 Spring AI 的 ChatResponse 流，graph 会在节点执行完成后把最终结果收敛成 AssistantMessage 存回 state["draft"]。
         val flux = ChatClient.create(chatModel)
             .prompt()
             .system("你是一个适合教程演示的旅行助手。输出要口语化、结构清晰，分成目的地亮点、半日安排、注意事项三部分。")
-            .user("请根据这段需求给我一个简短旅行攻略：$input")
+            .user("请根据这段需求给我一个简短旅行攻略：$input$feedbackPrompt")
             .options(OpenAiChatOptions.builder().extraBody(mapOf("enable_thinking" to false)).build())
             .stream()
             .chatResponse()

@@ -15,36 +15,53 @@
 
 package com.zealsinger.kotlin.agent.server.a2a
 
+import com.alibaba.cloud.ai.graph.CompileConfig
 import com.alibaba.cloud.ai.graph.NodeOutput
+import com.alibaba.cloud.ai.graph.RunnableConfig
 import com.alibaba.cloud.ai.graph.StateGraph
+import com.alibaba.cloud.ai.graph.checkpoint.config.SaverConfig
+import com.alibaba.cloud.ai.graph.checkpoint.savers.MemorySaver
 import com.alibaba.cloud.ai.graph.streaming.OutputType
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput
+import com.zealsinger.kotlin.agent.server.graph.TestGraphSpec
+import com.zealsinger.kotlin.agent.server.graph.TestGraphSpec.MessageMetadataKey.CONFIRMATION_APPROVED
+import com.zealsinger.kotlin.agent.server.graph.TestGraphSpec.MessageMetadataKey.CONFIRMATION_FEEDBACK
 import io.a2a.server.agentexecution.AgentExecutor
 import io.a2a.server.agentexecution.RequestContext
 import io.a2a.server.events.EventQueue
+import io.a2a.server.tasks.TaskStore
 import io.a2a.server.tasks.TaskUpdater
 import io.a2a.spec.DataPart
+import io.a2a.spec.Message
+import io.a2a.spec.Task
+import io.a2a.spec.TaskState
+import io.a2a.spec.TaskStatus
 import io.a2a.spec.TextPart
 import org.springframework.stereotype.Component
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
-/**
- * 测试Agent执行器实现类
- *
- * 该类实现了A2A框架的AgentExecutor接口，提供了一个简单的测试Agent执行逻辑。
- * 主要用于验证A2A框架的基本功能和开发调试。
- *
- * @Component Spring组件注解，使该类被Spring容器管理
- * @see AgentExecutor A2A规范定义的Agent执行器接口
- */
 @Component
-class TestAgentExecutor(private val stateGraph: StateGraph): AgentExecutor {
+class TestAgentExecutor(
+    private val stateGraph: StateGraph,
+    private val taskStore: TaskStore
+): AgentExecutor {
+    // 创建内存检查点器
+    private val saver = MemorySaver()
+
     override fun execute(
-        context: RequestContext?,
-        eventQueue: EventQueue?
+        context: RequestContext,
+        eventQueue: EventQueue
     ) {
         val taskUpdater = TaskUpdater(context, eventQueue)
         val artifactNum = AtomicInteger()
+        // 使用检查点器编译图
+        val compiledGraph = stateGraph.compile(
+            CompileConfig.builder()
+                .saverConfig(SaverConfig.builder().register(saver).build())
+                .interruptBefore(TestGraphSpec.Node.CONFIRM)
+                .build()
+        )
         fun handlerNodeOutput(nodeOutput: NodeOutput) {
             if (nodeOutput is StreamingOutput<*>) {
                 when (nodeOutput.outputType) {
@@ -67,12 +84,77 @@ class TestAgentExecutor(private val stateGraph: StateGraph): AgentExecutor {
 
                     else -> {}
                 }
+                return
             }
+            taskUpdater.addArtifact(
+                listOf(DataPart(nodeOutput.state().data())),
+                artifactNum.incrementAndGet().toString(),
+                nodeOutput.node(),
+                mapOf()
+            )
         }
-        val text = ((context?.message?.parts?.first { it is TextPart }) as TextPart).text
-        stateGraph.compile().stream(mapOf("input" to text))
+        val message = context.message
+        // 判断任务是否存在
+        val existingTask = message.taskId?.let(taskStore::get)
+        if (existingTask != null) {
+            // 任务存在，继续执行
+            val runnableConfig = RunnableConfig.builder().threadId(existingTask.id).build()
+            // 获取前端输入 默认为不通过
+            val approved = message.metadata[CONFIRMATION_APPROVED] as? Boolean ?: false
+            // 获取前端输入 默认为空字符串
+            val feedback = message.metadata[CONFIRMATION_FEEDBACK] as? String ?: ""
+            val resumedConfig = compiledGraph.updateState(
+                runnableConfig,
+                mapOf(
+                    TestGraphSpec.StateKey.CONFIRMATION_APPROVED to approved,
+                    TestGraphSpec.StateKey.CONFIRMATION_FEEDBACK to feedback,
+                )
+            )
+            compiledGraph.stream(null,resumedConfig)
+                .doOnNext(::handlerNodeOutput)
+                .doOnComplete(taskUpdater::complete)
+                .blockLast()
+            return
+        }
+        val newTask = newTask(message)
+        eventQueue?.enqueueEvent(newTask)
+
+        val input = ((message.parts.first { it is TextPart }) as TextPart).text
+        val runnableConfig = RunnableConfig.builder().threadId(newTask.id).build()
+
+        compiledGraph.stream(mapOf(TestGraphSpec.StateKey.INPUT to input), runnableConfig)
             .doOnNext(::handlerNodeOutput)
-            .doOnComplete(taskUpdater::complete)
+            .doOnComplete {
+                val stateSnapshot = compiledGraph.getState(runnableConfig)
+                if (stateSnapshot.next() != TestGraphSpec.Node.CONFIRM) {
+                    taskUpdater.complete()
+                    return@doOnComplete
+                }
+
+                val stateData = LinkedHashMap(stateSnapshot.state().data())
+                taskUpdater.addArtifact(
+                    listOf(DataPart(
+                        mapOf(
+                            TestGraphSpec.StateKey.SCENE to stateData[TestGraphSpec.StateKey.SCENE],
+                            TestGraphSpec.StateKey.SCENE_LABEL to stateData[TestGraphSpec.StateKey.SCENE_LABEL],
+                            TestGraphSpec.ArtifactDataKey.NEED_CONFIRMATION to true,
+                        )
+                    )),
+                    artifactNum.incrementAndGet().toString(),
+                    TestGraphSpec.Node.CONFIRM,
+                    mapOf("outputType" to TestGraphSpec.ArtifactOutputType.HUMAN_CONFIRMATION)
+                )
+
+                taskUpdater.requiresInput(
+                    taskUpdater.newAgentMessage(
+                        listOf(TextPart("已判断当前场景为${stateData[TestGraphSpec.StateKey.SCENE_LABEL]}，请确认是否继续执行。")),
+                        mapOf(
+                            TestGraphSpec.StateKey.SCENE to stateData[TestGraphSpec.StateKey.SCENE],
+                            TestGraphSpec.StateKey.SCENE_LABEL to stateData[TestGraphSpec.StateKey.SCENE_LABEL],
+                        )
+                    )
+                )
+            }
             .blockLast()
     }
 
@@ -100,6 +182,18 @@ class TestAgentExecutor(private val stateGraph: StateGraph): AgentExecutor {
         eventQueue: EventQueue?
     ) {
         return
+    }
+
+    private fun newTask(request: Message): Task {
+        var contextId = request.contextId
+        if (contextId == null || contextId.isEmpty()) {
+            contextId = UUID.randomUUID().toString()
+        }
+        var id = UUID.randomUUID().toString()
+        if (request.taskId != null && !request.taskId.isEmpty()) {
+            id = request.taskId
+        }
+        return Task(id, contextId, TaskStatus(TaskState.SUBMITTED), null, listOf(request), null)
     }
 
 }
