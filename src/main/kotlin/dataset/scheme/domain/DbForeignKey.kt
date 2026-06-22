@@ -1,0 +1,28 @@
+package com.zealsinger.kotlin.agent.dataset.scheme.domain
+
+import org.babyfish.jimmer.sql.Entity
+import org.babyfish.jimmer.sql.GeneratedValue
+import org.babyfish.jimmer.sql.Id
+import org.babyfish.jimmer.sql.Key
+import org.babyfish.jimmer.sql.ManyToOne
+import org.babyfish.jimmer.sql.meta.UUIDIdGenerator
+import java.util.UUID
+
+
+@Entity
+interface DbForeignKey {
+    @Id
+    @GeneratedValue(generatorType = UUIDIdGenerator::class)
+    val id: UUID
+
+    @Key
+    @ManyToOne
+    val sourceColumn: DbColumn
+
+    @Key
+    @ManyToOne
+    val targetColumn: DbColumn
+}
+
+fun DbForeignKey.toExpression(): String =
+    "${sourceColumn.dbTable.name}.${sourceColumn.name} = ${targetColumn.dbTable.name}.${targetColumn.name}"

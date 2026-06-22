@@ -3,6 +3,7 @@ plugins {
     id("com.google.devtools.ksp") version "2.3.0"
     id("org.springframework.boot") version "3.5.9"
     id("tech.argonariod.gradle-plugin-jimmer") version "latest.release"
+    kotlin("plugin.spring") version "2.3.0"
 }
 apply(plugin = "io.spring.dependency-management")
 
@@ -30,6 +31,10 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.postgresql:postgresql")
     implementation("io.github.a2asdk:a2a-java-sdk-transport-jsonrpc:$A2A_SDK_VERSION") // a2a协议
+
+    implementation("org.springframework.ai:spring-ai-starter-vector-store-pgvector")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    implementation(kotlin("stdlib"))
 }
 
 // 测试工具管理 默认使用 JUnit5

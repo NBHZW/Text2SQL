@@ -12,11 +12,20 @@ spring:
     driver-class-name: org.postgresql.Driver
   ai:
     openai:
-      base-url: https://api.aicodemirror.com/api/codex/backend-api/codex
-      api-key: sk-ant-api03-Hrnq5GCsTawUfzHFMwQ0YOd9EVwh9q_wQsX2fgc8rZIHs_3UaBpXNiNGWUoD1T0o_exbhb_1Coc4DaToNnA6KA
+      base-url: https://www.dmxapi.cn
+      api-key: sk-oeCrzBvgqCxJU0ZLkqyOR7hStn6WciUAwFHsNXDIwLMzwfwI
       chat:
         options:
-          model: gpt-5.5
+          model: deepseek-v4-flash
+      embedding:
+        options:
+          model: Qwen/Qwen3-Embedding-8B
+    vectorstore:
+      pgvector:
+        index-type: HNSW               # 2026 年主流的高性能向量索引，适合大规模数据
+        distance-type: cosine_distance # 语义搜索最常用的余弦相似度
+        dimensions: 1024               # text-embedding-v4 的固定维度
+        initialize-schema: true        # Spring AI 自动初始化 vector_store 表
 
 jimmer:
   dialect: org.babyfish.jimmer.sql.dialect.PostgresDialect  # sql方言
@@ -29,3 +38,14 @@ jimmer:
     openapi:
       path: /openapi
       ui-path: /openapi-ui
+
+## AgentHub 接入配置
+## 用法：
+##   学习场景实例：--agenthub.scene=study --server.port=9933
+##   旅游场景实例：--agenthub.scene=travel --server.port=9934
+#agenthub:
+#  enabled: ${AGENTHUB_ENABLED:true}
+#  hub-url: ${AGENTHUB_HUB_URL:http://localhost:8080}
+#  scene: ${AGENTHUB_SCENE:any}        # study | travel | any
+#  agent-id: ${AGENTHUB_AGENT_ID:}      # 留空自动生成
+#  agent-name: ${AGENTHUB_AGENT_NAME:}  # 留空自动取默认名

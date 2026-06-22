@@ -1,0 +1,16 @@
+export com.zealsinger.kotlin.agent.dataset.scheme.domain.DbForeignKey
+
+DbForeignKeySchemaView {
+    sourceColumn {
+        name
+        dbTable {
+            name
+        }
+    }
+    targetColumn {
+        name
+        dbTable {
+            name
+        }
+    }
+}

@@ -1,0 +1,11 @@
+export com.zealsinger.kotlin.agent.dataset.scheme.domain.DbTable
+
+DbTableSchemaView {
+    name
+    columns {
+        name
+        type
+        description
+        isPrimaryKey
+    }
+}
