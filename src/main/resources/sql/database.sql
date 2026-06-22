@@ -127,15 +127,12 @@ CREATE TABLE public.question_knowledge (
 );
 
 
---
--- Name: vector_store; Type: TABLE; Schema: public; Owner: -
---
 
 CREATE TABLE public.vector_store (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     content text,
     metadata json,
-    embedding public.vector(1024)
+    embedding public.vector(4096)
 );
 
 

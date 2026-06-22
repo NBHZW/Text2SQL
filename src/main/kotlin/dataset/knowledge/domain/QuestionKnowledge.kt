@@ -17,15 +17,3 @@ interface QuestionKnowledge {
     val question: String
     val answer: String
 }
-
-fun QuestionKnowledge.toDocument(): Document {
-
-    return Document(
-        question,
-        mapOf(
-            DataAgentSpec.Retrieval.DocumentMetadataKey.VECTOR_TYPE to DataAgentSpec.Retrieval.VectorType.QUESTION_KNOWLEDGE,
-            DataAgentSpec.Retrieval.DocumentMetadataKey.KNOWLEDGE_ID to id,
-            DataAgentSpec.Retrieval.DocumentMetadataKey.DATABASE_ID to databaseId
-        )
-    )
-}

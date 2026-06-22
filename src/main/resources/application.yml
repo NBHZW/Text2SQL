@@ -22,9 +22,9 @@ spring:
           model: Qwen/Qwen3-Embedding-8B
     vectorstore:
       pgvector:
-        index-type: HNSW               # 2026 年主流的高性能向量索引，适合大规模数据
+        index-type: NONE               # 4096 dimensions exceed pgvector HNSW index limit; use exact search for this model
         distance-type: cosine_distance # 语义搜索最常用的余弦相似度
-        dimensions: 1024               # text-embedding-v4 的固定维度
+        dimensions: 4096               # Qwen3-Embedding-8B 的固定维度
         initialize-schema: true        # Spring AI 自动初始化 vector_store 表
 
 jimmer:

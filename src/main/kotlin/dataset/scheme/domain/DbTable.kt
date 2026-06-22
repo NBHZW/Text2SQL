@@ -29,15 +29,3 @@ interface DbTable  {
     @OneToMany(mappedBy = "dbTable")
     val columns: List<DbColumn>
 }
-
-fun DbTable.toDocument(): Document {
-    // 确保必要字段已加载，或者在 Repository 层强制 Fetch
-    return Document(
-        description,
-        mapOf(
-            DataAgentSpec.Retrieval.DocumentMetadataKey.VECTOR_TYPE to DataAgentSpec.Retrieval.VectorType.TABLE,
-            DataAgentSpec.Retrieval.DocumentMetadataKey.DATABASE_ID to databaseId,
-            DataAgentSpec.Retrieval.DocumentMetadataKey.TABLE_ID to id
-        )
-    )
-}
