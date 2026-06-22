@@ -3,21 +3,62 @@ package com.zealsinger.kotlin.agent.server.graph
 
 import com.alibaba.cloud.ai.graph.KeyStrategy
 import com.alibaba.cloud.ai.graph.KeyStrategyFactory
+import com.alibaba.cloud.ai.graph.OverAllState
 import com.alibaba.cloud.ai.graph.StateGraph
+import com.alibaba.cloud.ai.graph.StateGraph.END
+import com.alibaba.cloud.ai.graph.StateGraph.START
 import com.alibaba.cloud.ai.graph.action.AsyncEdgeAction
 import com.alibaba.cloud.ai.graph.action.AsyncNodeAction
-import com.zealsinger.kotlin.agent.server.edge.TestConfirmationBranchEdge
-import com.zealsinger.kotlin.agent.server.nodes.TestResumeNode
-import com.zealsinger.kotlin.agent.server.nodes.TestSceneRouterNode
-import com.zealsinger.kotlin.agent.server.nodes.TestStudyPlanNode
-import com.zealsinger.kotlin.agent.server.nodes.TestTravelPlanNode
-import com.zealsinger.kotlin.agent.server.nodes.TestWrapUpNode
+import com.alibaba.cloud.ai.graph.action.AsyncNodeAction.node_async
+import com.alibaba.cloud.ai.graph.serializer.StateSerializer
+import com.alibaba.cloud.ai.graph.serializer.plain_text.jackson.SpringAIJacksonStateSerializer
+import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.zealsinger.kotlin.agent.agent.DataAgentSpec
+import com.zealsinger.kotlin.agent.server.nodes.EvidenceRecallNode
+import com.zealsinger.kotlin.agent.server.nodes.SchemeReCallNode
+import org.babyfish.jimmer.jackson.v2.ImmutableModuleV2
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration
 open class GraphConfiguration {
+
     @Bean
+    open fun serializer(): SpringAIJacksonStateSerializer {
+        val serializer =
+            SpringAIJacksonStateSerializer { OverAllState(it) }
+        serializer.objectMapper().registerModules(JavaTimeModule())
+        serializer.objectMapper().registerModules(ImmutableModuleV2())
+        return serializer
+    }
+
+    @Bean
+    open fun graph(
+        evidenceRecallNode: EvidenceRecallNode,
+        schemeReCallNode: SchemeReCallNode,
+        serializer: StateSerializer
+    ): StateGraph {
+        val keyStrategyFactory = KeyStrategyFactory {
+            val map = mutableMapOf<String, KeyStrategy>()
+            map[DataAgentSpec.Graph.StateKey.Recall.REWRITE_QUERY] = ReplaceStrategy()
+            map[DataAgentSpec.Graph.StateKey.Recall.EVIDENCE] = ReplaceStrategy()
+            map[DataAgentSpec.Graph.StateKey.Recall.TABLE_SCHEMA] = ReplaceStrategy()
+            map[DataAgentSpec.Graph.StateKey.Recall.COLUMN_SCHEMA] = ReplaceStrategy()
+            map[DataAgentSpec.Graph.StateKey.Input.DATABASE_ID] = ReplaceStrategy()
+            map[DataAgentSpec.Graph.StateKey.Input.USER_INPUT] = ReplaceStrategy()
+            map
+        }
+        return StateGraph(DataAgentSpec.GRAPH_NAME, keyStrategyFactory, serializer)
+            .addNode(DataAgentSpec.Graph.Node.EVIDENCE_RECALL, node_async(evidenceRecallNode))
+            .addNode(DataAgentSpec.Graph.Node.SCHEMA_RECALL, node_async(schemeReCallNode))
+            .addEdge(START, DataAgentSpec.Graph.Node.EVIDENCE_RECALL)
+            .addEdge(DataAgentSpec.Graph.Node.EVIDENCE_RECALL, DataAgentSpec.Graph.Node.SCHEMA_RECALL)
+            .addEdge(DataAgentSpec.Graph.Node.SCHEMA_RECALL, END)
+
+    }
+
+    /*@Bean
     open fun testBranchStreamingGraph(
         testSceneRouterNode: TestSceneRouterNode,
         testTravelPlanNode: TestTravelPlanNode,
@@ -58,5 +99,5 @@ open class GraphConfiguration {
             .addEdge(TestGraphSpec.Node.TRAVEL_PLAN, TestGraphSpec.Node.WRAP_UP)
             .addEdge(TestGraphSpec.Node.STUDY_PLAN, TestGraphSpec.Node.WRAP_UP)
             .addEdge(TestGraphSpec.Node.WRAP_UP, StateGraph.END)
-    }
+    }*/
 }
