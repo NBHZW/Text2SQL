@@ -17,6 +17,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.zealsinger.kotlin.agent.agent.DataAgentSpec
 import com.zealsinger.kotlin.agent.server.nodes.EvidenceRecallNode
 import com.zealsinger.kotlin.agent.server.nodes.SchemeReCallNode
+import com.zealsinger.kotlin.agent.server.nodes.TableRelationNode
 import org.babyfish.jimmer.jackson.v2.ImmutableModuleV2
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -37,6 +38,7 @@ open class GraphConfiguration {
     open fun graph(
         evidenceRecallNode: EvidenceRecallNode,
         schemeReCallNode: SchemeReCallNode,
+        tableRelationNode: TableRelationNode,
         serializer: StateSerializer
     ): StateGraph {
         val keyStrategyFactory = KeyStrategyFactory {
@@ -45,6 +47,7 @@ open class GraphConfiguration {
             map[DataAgentSpec.Graph.StateKey.Recall.EVIDENCE] = ReplaceStrategy()
             map[DataAgentSpec.Graph.StateKey.Recall.TABLE_SCHEMA] = ReplaceStrategy()
             map[DataAgentSpec.Graph.StateKey.Recall.COLUMN_SCHEMA] = ReplaceStrategy()
+            map[DataAgentSpec.Graph.StateKey.Recall.TABLE_RELATION] = ReplaceStrategy()
             map[DataAgentSpec.Graph.StateKey.Input.DATABASE_ID] = ReplaceStrategy()
             map[DataAgentSpec.Graph.StateKey.Input.USER_INPUT] = ReplaceStrategy()
             map
@@ -52,9 +55,11 @@ open class GraphConfiguration {
         return StateGraph(DataAgentSpec.GRAPH_NAME, keyStrategyFactory, serializer)
             .addNode(DataAgentSpec.Graph.Node.EVIDENCE_RECALL, node_async(evidenceRecallNode))
             .addNode(DataAgentSpec.Graph.Node.SCHEMA_RECALL, node_async(schemeReCallNode))
+            .addNode(DataAgentSpec.Graph.Node.TABLE_RELATION, node_async(tableRelationNode))
             .addEdge(START, DataAgentSpec.Graph.Node.EVIDENCE_RECALL)
             .addEdge(DataAgentSpec.Graph.Node.EVIDENCE_RECALL, DataAgentSpec.Graph.Node.SCHEMA_RECALL)
-            .addEdge(DataAgentSpec.Graph.Node.SCHEMA_RECALL, END)
+            .addEdge(DataAgentSpec.Graph.Node.SCHEMA_RECALL, DataAgentSpec.Graph.Node.TABLE_RELATION)
+            .addEdge(DataAgentSpec.Graph.Node.TABLE_RELATION, END)
 
     }
 

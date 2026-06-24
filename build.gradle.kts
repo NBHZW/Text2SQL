@@ -31,6 +31,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.postgresql:postgresql")
     implementation("io.github.a2asdk:a2a-java-sdk-transport-jsonrpc:$A2A_SDK_VERSION") // a2a协议
+    implementation("org.xerial:sqlite-jdbc")
 
     implementation("org.springframework.ai:spring-ai-starter-vector-store-pgvector")
     testImplementation("org.springframework.boot:spring-boot-starter-test")

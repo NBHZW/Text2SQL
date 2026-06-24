@@ -1,5 +1,6 @@
 package com.zealsinger.kotlin.agent.dataset.scheme.domain
 
+import com.zealsinger.kotlin.agent.dataset.scheme.domain.dto.DbForeignKeySchemaView
 import org.babyfish.jimmer.sql.Entity
 import org.babyfish.jimmer.sql.GeneratedValue
 import org.babyfish.jimmer.sql.Id
@@ -24,5 +25,5 @@ interface DbForeignKey {
     val targetColumn: DbColumn
 }
 
-fun DbForeignKey.toExpression(): String =
+fun DbForeignKeySchemaView.toExpression(): String =
     "${sourceColumn.dbTable.name}.${sourceColumn.name} = ${targetColumn.dbTable.name}.${targetColumn.name}"
