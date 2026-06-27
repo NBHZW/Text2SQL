@@ -6,6 +6,7 @@ import com.zealsinger.kotlin.agent.agent.DataAgentSpec
 import com.zealsinger.kotlin.agent.model.Plan
 import com.zealsinger.kotlin.agent.model.Schema
 import com.zealsinger.kotlin.agent.prompt.PromptManager
+import com.zealsinger.kotlin.agent.util.JsonUtil
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.converter.BeanOutputConverter
@@ -16,8 +17,10 @@ import org.springframework.stereotype.Component
 class PlannerNode(private val chatModel: ChatModel, private val promptManager: PromptManager) : NodeAction {
     override fun apply(state: OverAllState): Map<String, Any> {
         val rewriteQuery = state.value(DataAgentSpec.Graph.StateKey.Recall.REWRITE_QUERY, "")
-        val schemeDto =
-            state.value(DataAgentSpec.Graph.StateKey.Recall.TABLE_RELATION, Schema::class.java).orElseThrow()
+        val schemeDto =  JsonUtil.fromJson(
+            state.value(DataAgentSpec.Graph.StateKey.Recall.TABLE_RELATION, String::class.java).orElseThrow(),
+            Schema::class.java
+        )!!
         val feedbackContent = state.value(DataAgentSpec.Graph.StateKey.HumanReview.CONFIRMATION_FEEDBACK, "");
         val schemePrompt = schemeDto.buildSchemePrompt()
         val evidence = state.value(DataAgentSpec.Graph.StateKey.Recall.EVIDENCE, "")

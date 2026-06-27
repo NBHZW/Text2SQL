@@ -5,6 +5,7 @@ import com.alibaba.cloud.ai.graph.action.NodeAction
 import com.zealsinger.kotlin.agent.agent.DataAgentSpec
 import com.zealsinger.kotlin.agent.model.Schema
 import com.zealsinger.kotlin.agent.prompt.PromptManager
+import com.zealsinger.kotlin.agent.util.JsonUtil
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.chat.model.ChatModel
@@ -16,9 +17,10 @@ private val logger = KotlinLogging.logger {}
 class FeasibilityAssessmentNode(private val chatModel: ChatModel, private val promptManager: PromptManager) : NodeAction {
     override fun apply(state: OverAllState): Map<String, Any> {
         val rewriteQuery = state.value(DataAgentSpec.Graph.StateKey.Recall.REWRITE_QUERY, "")
-        val schema = state.value(DataAgentSpec.Graph.StateKey.Recall.TABLE_RELATION, Schema::class.java).orElseThrow {
-            RuntimeException("Unable to read Schema")
-        }
+        val schema = JsonUtil.fromJson(
+            state.value(DataAgentSpec.Graph.StateKey.Recall.TABLE_RELATION, String::class.java).orElseThrow {
+                RuntimeException("Unable to read Schema")
+            }, Schema::class.java)!!
         val evidence = state.value(DataAgentSpec.Graph.StateKey.Recall.EVIDENCE, "")
         val multiTurn = state.value(DataAgentSpec.Graph.StateKey.Input.MULTI_TURN_CONTEXT, "(无)")
         val prompt = promptManager.feasibilityAssessmentPromptTemplate.render(

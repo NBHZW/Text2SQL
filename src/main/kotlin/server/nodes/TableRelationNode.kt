@@ -13,6 +13,7 @@ import com.zealsinger.kotlin.agent.dataset.scheme.repository.DbForeignKeyReposit
 import com.zealsinger.kotlin.agent.dataset.scheme.repository.DbTableRepository
 import com.zealsinger.kotlin.agent.model.Schema
 import com.zealsinger.kotlin.agent.prompt.PromptManager
+import com.zealsinger.kotlin.agent.util.JsonUtil
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.chat.model.ChatModel
@@ -139,11 +140,13 @@ class TableRelationNode(
             "mix select filter tables $filterResult"
         }
         return mapOf(
-            DataAgentSpec.Graph.StateKey.Recall.TABLE_RELATION to Schema(
-                databaseId,
-                filterTables.map { DbTableSchemaView(it) },
-                filterForeignKeys.map { DbForeignKeySchemaView(it) },
-            )
+            DataAgentSpec.Graph.StateKey.Recall.TABLE_RELATION to JsonUtil.toJson(
+                Schema(
+                    databaseId,
+                    filterTables.map { DbTableSchemaView(it) },
+                    filterForeignKeys.map { DbForeignKeySchemaView(it) },
+                )
+            )!!
         )
     }
 
