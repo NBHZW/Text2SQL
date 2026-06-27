@@ -21,6 +21,7 @@ object DataAgentSpec {
             const val PYTHON_EXECUTION = "PYTHON_EXECUTE_NODE"
             const val PYTHON_ANALYSIS = "PYTHON_ANALYZE_NODE"
             const val REPORT_GENERATION = "REPORT_GENERATOR_NODE"
+            const val INTERRUPT_NODE = HUMAN_FEEDBACK
         }
 
         object StateKey {
@@ -40,17 +41,15 @@ object DataAgentSpec {
 
             object Planning {
                 const val PLAN = "PLANNER_NODE_OUTPUT"
-                const val VALIDATION_ERROR = "PLAN_VALIDATION_ERROR"
                 const val REPAIR_COUNT = "PLAN_REPAIR_COUNT"
                 const val NEXT_NODE = "PLAN_NEXT_NODE"
                 const val CURRENT_STEP = "PLAN_CURRENT_STEP"
-                const val VALIDATION_STATUS = "PLAN_VALIDATION_STATUS"
                 const val EXECUTION_OUTPUT = "PLAN_EXECUTE_NODE_OUTPUT"
             }
 
             object HumanReview {
-                const val FEEDBACK = "HUMAN_FEEDBACK_NODE_OUTPUT"
-                const val REVIEW_ENABLED = "HUMAN_REVIEW_ENABLED"
+                const val CONFIRMATION_APPROVED = "confirmationApproved"
+                const val CONFIRMATION_FEEDBACK = "confirmationFeedback"
                 const val NEXT_NODE = "HUMAN_NEXT_NODE"
             }
 
@@ -83,6 +82,12 @@ object DataAgentSpec {
         const val SEMANTIC_MODEL = "semantic-model"
         const val JSON_FIX = "json-fix"
         const val DATA_VIEW_ANALYZE = "data-view-analyze"
+    }
+
+    object MessageMetadataKey {
+        const val DATABASE_ID = "databaseId"
+        const val CONFIRMATION_APPROVED = "confirmationApproved"
+        const val CONFIRMATION_FEEDBACK = "confirmationFeedback"
     }
 
     object Retrieval {

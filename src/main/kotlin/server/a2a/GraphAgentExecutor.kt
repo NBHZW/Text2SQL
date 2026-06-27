@@ -9,9 +9,11 @@ import com.alibaba.cloud.ai.graph.checkpoint.savers.MemorySaver
 import com.alibaba.cloud.ai.graph.streaming.OutputType
 import com.alibaba.cloud.ai.graph.streaming.StreamingOutput
 import com.zealsinger.kotlin.agent.agent.DataAgentSpec
+import com.zealsinger.kotlin.agent.agent.DataAgentSpec.Graph.Node.INTERRUPT_NODE
 import io.a2a.server.agentexecution.AgentExecutor
 import io.a2a.server.agentexecution.RequestContext
 import io.a2a.server.events.EventQueue
+import io.a2a.server.tasks.TaskStore
 import io.a2a.server.tasks.TaskUpdater
 import io.a2a.spec.DataPart
 import io.a2a.spec.Message
@@ -22,23 +24,23 @@ import io.a2a.spec.TextPart
 import org.springframework.stereotype.Component
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
-
 @Component
-class TestAgentExecutor(
+class GraphAgentExecutor(
     private val stateGraph: StateGraph,
+    private val taskStore: TaskStore,
 ) : AgentExecutor {
 
     private val saver = MemorySaver()
-
     override fun execute(
         context: RequestContext,
-        eventQueue: EventQueue
+        eventQueue: EventQueue?
     ) {
         val taskUpdater = TaskUpdater(context, eventQueue)
         val artifactNum = AtomicInteger()
         val compiledGraph = stateGraph.compile(
             CompileConfig.builder()
                 .saverConfig(SaverConfig.builder().register(saver).build())
+                .interruptBefore(INTERRUPT_NODE)
                 .build()
         )
 
@@ -46,13 +48,15 @@ class TestAgentExecutor(
             if (nodeOutput is StreamingOutput<*>) {
                 when (nodeOutput.outputType) {
                     OutputType.GRAPH_NODE_STREAMING -> {
-                        val text = nodeOutput.message()?.text?.takeIf { it.isNotEmpty() } ?: return
-                        taskUpdater.addArtifact(
-                            listOf(TextPart(text)),
-                            artifactNum.incrementAndGet().toString(),
-                            nodeOutput.node(),
-                            mapOf("outputType" to nodeOutput.outputType)
-                        )
+                        val message = nodeOutput.message()
+                        if (message != null) {
+                            taskUpdater.addArtifact(
+                                listOf(TextPart(message.text)),
+                                artifactNum.incrementAndGet().toString(),
+                                nodeOutput.node(),
+                                mapOf("outputType" to nodeOutput.outputType)
+                            )
+                        }
                     }
 
                     OutputType.GRAPH_NODE_FINISHED -> taskUpdater.addArtifact(
@@ -76,30 +80,52 @@ class TestAgentExecutor(
         }
 
         val message = context.message
+        val existingTask = message.taskId?.let(taskStore::get)
+        if (existingTask != null) {
+            val runnableConfig = RunnableConfig.builder().threadId(existingTask.id).build()
+            val approved =
+                message.metadata[DataAgentSpec.MessageMetadataKey.CONFIRMATION_APPROVED]
+            val feedback =
+                message.metadata[DataAgentSpec.MessageMetadataKey.CONFIRMATION_FEEDBACK]
+            val resumedConfig = compiledGraph.updateState(
+                runnableConfig,
+                mapOf(
+                    DataAgentSpec.Graph.StateKey.HumanReview.CONFIRMATION_APPROVED to approved,
+                    DataAgentSpec.Graph.StateKey.HumanReview.CONFIRMATION_FEEDBACK to feedback,
+                )
+            )
+            compiledGraph.stream(null, resumedConfig)
+                .doOnNext(::handleNodeOutput)
+                .doOnComplete(taskUpdater::complete)
+                .blockLast()
+            return
+        }
+
         val newTask = newTask(message)
-        eventQueue.enqueueEvent(newTask)
+        eventQueue?.enqueueEvent(newTask)
 
         val input = ((message.parts.first { it is TextPart }) as TextPart).text
         val runnableConfig = RunnableConfig.builder().threadId(newTask.id).build()
-        val initialState = mapOf(
-            DataAgentSpec.Graph.StateKey.Input.USER_INPUT to input,
-            DataAgentSpec.Graph.StateKey.Input.DATABASE_ID to
-                (message.metadata[DataAgentSpec.Graph.StateKey.Input.DATABASE_ID] as? String ?: ""),
-            DataAgentSpec.Graph.StateKey.Input.MULTI_TURN_CONTEXT to
-                (message.metadata[DataAgentSpec.Graph.StateKey.Input.MULTI_TURN_CONTEXT] as? String ?: "(无)"),
+        compiledGraph.stream(
+            mapOf(
+                DataAgentSpec.Graph.StateKey.Input.USER_INPUT to input,
+                DataAgentSpec.Graph.StateKey.Input.DATABASE_ID to message.metadata[DataAgentSpec.MessageMetadataKey.DATABASE_ID]
+            ),runnableConfig
         )
-
-        compiledGraph.stream(initialState, runnableConfig)
-            .doOnNext(::handleNodeOutput)
-            .doOnComplete(taskUpdater::complete)
-            .blockLast()
+        .doOnNext(::handleNodeOutput)
+        .doOnComplete {
+            val stateSnapshot = compiledGraph.getState(runnableConfig)
+            if (stateSnapshot.next() == INTERRUPT_NODE) {
+                taskUpdater.requiresInput()
+            }
+        }
+        .blockLast()
     }
 
     override fun cancel(
         context: RequestContext?,
         eventQueue: EventQueue?
     ) {
-        return
     }
 
     private fun newTask(request: Message): Task {
@@ -113,4 +139,5 @@ class TestAgentExecutor(
         }
         return Task(id, contextId, TaskStatus(TaskState.SUBMITTED), null, listOf(request), null)
     }
+
 }
