@@ -7,9 +7,7 @@ import com.alibaba.cloud.ai.graph.OverAllState
 import com.alibaba.cloud.ai.graph.StateGraph
 import com.alibaba.cloud.ai.graph.StateGraph.END
 import com.alibaba.cloud.ai.graph.StateGraph.START
-import com.alibaba.cloud.ai.graph.action.AsyncEdgeAction
 import com.alibaba.cloud.ai.graph.action.AsyncEdgeAction.edge_async
-import com.alibaba.cloud.ai.graph.action.AsyncNodeAction
 import com.alibaba.cloud.ai.graph.action.AsyncNodeAction.node_async
 import com.alibaba.cloud.ai.graph.serializer.StateSerializer
 import com.alibaba.cloud.ai.graph.serializer.plain_text.jackson.SpringAIJacksonStateSerializer
@@ -17,12 +15,16 @@ import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.zealsinger.kotlin.agent.agent.DataAgentSpec
 import com.zealsinger.kotlin.agent.server.edge.FeasibilityAssessmentEdge
+import com.zealsinger.kotlin.agent.server.edge.HumanFeedbackEdge
+import com.zealsinger.kotlin.agent.server.edge.PlanExecutorEdge
 import com.zealsinger.kotlin.agent.server.nodes.EvidenceRecallNode
 import com.zealsinger.kotlin.agent.server.nodes.FeasibilityAssessmentNode
 import com.zealsinger.kotlin.agent.server.nodes.HumanFeedbackNode
 import com.zealsinger.kotlin.agent.server.nodes.PlanExecuteNode
 import com.zealsinger.kotlin.agent.server.nodes.PlannerNode
 import com.zealsinger.kotlin.agent.server.nodes.SchemeReCallNode
+import com.zealsinger.kotlin.agent.server.nodes.SqlExecuteNode
+import com.zealsinger.kotlin.agent.server.nodes.SqlGeneratorNode
 import com.zealsinger.kotlin.agent.server.nodes.TableRelationNode
 import org.babyfish.jimmer.jackson.v2.ImmutableModuleV2
 import org.springframework.context.annotation.Bean
@@ -49,6 +51,8 @@ open class GraphConfiguration {
         plannerNode: PlannerNode,
         humanFeedbackNode: HumanFeedbackNode,
         planExecuteNode: PlanExecuteNode,
+        sqlGeneratorNode: SqlGeneratorNode,
+        sqlExecuteNode: SqlExecuteNode,
         serializer: StateSerializer
     ): StateGraph {
         val keyStrategyFactory = KeyStrategyFactory {
@@ -72,6 +76,8 @@ open class GraphConfiguration {
             map[DataAgentSpec.Graph.StateKey.HumanReview.NEXT_NODE] = ReplaceStrategy()
 
             map[DataAgentSpec.Graph.StateKey.Execution.FEASIBILITY_RESULT] = ReplaceStrategy()
+            map[DataAgentSpec.Graph.StateKey.Execution.SQL_GENERATION_RESULT] = ReplaceStrategy()
+            map[DataAgentSpec.Graph.StateKey.Execution.SQL_EXECUTION_RESULT] = ReplaceStrategy()
             map
         }
         return StateGraph(DataAgentSpec.GRAPH_NAME, keyStrategyFactory, serializer)
@@ -82,6 +88,8 @@ open class GraphConfiguration {
             .addNode(DataAgentSpec.Graph.Node.PLANNER, node_async(plannerNode))
             .addNode(DataAgentSpec.Graph.Node.HUMAN_FEEDBACK, node_async(humanFeedbackNode))
             .addNode(DataAgentSpec.Graph.Node.PLAN_EXECUTION, node_async(planExecuteNode))
+            .addNode(DataAgentSpec.Graph.Node.SQL_GENERATION, node_async(sqlGeneratorNode))
+            .addNode(DataAgentSpec.Graph.Node.SQL_EXECUTION, node_async(sqlExecuteNode))
             .addEdge(START, DataAgentSpec.Graph.Node.EVIDENCE_RECALL)
             .addEdge(DataAgentSpec.Graph.Node.EVIDENCE_RECALL, DataAgentSpec.Graph.Node.SCHEMA_RECALL)
             .addEdge(DataAgentSpec.Graph.Node.SCHEMA_RECALL, DataAgentSpec.Graph.Node.TABLE_RELATION)
@@ -102,50 +110,16 @@ open class GraphConfiguration {
                     DataAgentSpec.Graph.Node.PLAN_EXECUTION to DataAgentSpec.Graph.Node.PLAN_EXECUTION,
                     DataAgentSpec.Graph.Node.PLANNER to DataAgentSpec.Graph.Node.PLANNER
                 )
-            ).addEdge(DataAgentSpec.Graph.Node.PLAN_EXECUTION, END)
+            )
+            .addConditionalEdges(
+                DataAgentSpec.Graph.Node.PLAN_EXECUTION, edge_async(PlanExecutorEdge()),
+                mapOf(
+                    DataAgentSpec.Graph.Node.SQL_GENERATION to DataAgentSpec.Graph.Node.SQL_GENERATION,
+                    END to END,
+                )
+            )
+            .addEdge(DataAgentSpec.Graph.Node.SQL_GENERATION, DataAgentSpec.Graph.Node.SQL_EXECUTION)
+            .addEdge(DataAgentSpec.Graph.Node.SQL_EXECUTION, END)
 
     }
-
-    /*@Bean
-    open fun testBranchStreamingGraph(
-        testSceneRouterNode: TestSceneRouterNode,
-        testTravelPlanNode: TestTravelPlanNode,
-        testStudyPlanNode: TestStudyPlanNode,
-        testWrapUpNode: TestWrapUpNode,
-        testConfirmationBranchEdge: TestConfirmationBranchEdge,
-        testResumeNode: TestResumeNode,
-    ): StateGraph {
-        val keyStrategyFactory = KeyStrategyFactory {
-            mutableMapOf(
-                TestGraphSpec.StateKey.INPUT to KeyStrategy.REPLACE,
-                TestGraphSpec.StateKey.SCENE to KeyStrategy.REPLACE,
-                TestGraphSpec.StateKey.SCENE_LABEL to KeyStrategy.REPLACE,
-                TestGraphSpec.StateKey.DRAFT to KeyStrategy.REPLACE,
-                TestGraphSpec.StateKey.FINAL_OUTPUT to KeyStrategy.REPLACE,
-                TestGraphSpec.StateKey.CONFIRMATION_APPROVED to KeyStrategy.REPLACE,
-                TestGraphSpec.StateKey.CONFIRMATION_FEEDBACK to KeyStrategy.REPLACE,
-            )
-        }
-
-        return StateGraph(keyStrategyFactory)
-            .addNode(TestGraphSpec.Node.ROUTE, AsyncNodeAction.node_async(testSceneRouterNode))
-            .addNode(TestGraphSpec.Node.CONFIRM, AsyncNodeAction.node_async(testResumeNode))
-            .addNode(TestGraphSpec.Node.TRAVEL_PLAN, AsyncNodeAction.node_async(testTravelPlanNode))
-            .addNode(TestGraphSpec.Node.STUDY_PLAN, AsyncNodeAction.node_async(testStudyPlanNode))
-            .addNode(TestGraphSpec.Node.WRAP_UP, AsyncNodeAction.node_async(testWrapUpNode))
-            .addEdge(StateGraph.START, TestGraphSpec.Node.ROUTE)
-            .addEdge(TestGraphSpec.Node.ROUTE, TestGraphSpec.Node.CONFIRM)
-            .addConditionalEdges(
-                TestGraphSpec.Node.CONFIRM,
-                AsyncEdgeAction.edge_async(testConfirmationBranchEdge),
-                mapOf(
-                    TestGraphSpec.Scene.TRAVEL to TestGraphSpec.Node.TRAVEL_PLAN,
-                    TestGraphSpec.Scene.STUDY to TestGraphSpec.Node.STUDY_PLAN,
-                    StateGraph.END to StateGraph.END,
-                ),
-            )
-            .addEdge(TestGraphSpec.Node.TRAVEL_PLAN, TestGraphSpec.Node.WRAP_UP)
-            .addEdge(TestGraphSpec.Node.STUDY_PLAN, TestGraphSpec.Node.WRAP_UP)
-            .addEdge(TestGraphSpec.Node.WRAP_UP, StateGraph.END)
-    }*/
 }

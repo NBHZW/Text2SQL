@@ -1,10 +1,9 @@
-package com.zealsinger.kotlin.agent.server.graph
+package com.zealsinger.kotlin.agent.server.edge
 
 import com.alibaba.cloud.ai.graph.OverAllState
 import com.alibaba.cloud.ai.graph.StateGraph
 import com.alibaba.cloud.ai.graph.action.EdgeAction
 import com.zealsinger.kotlin.agent.agent.DataAgentSpec
-
 
 class HumanFeedbackEdge : EdgeAction {
     override fun apply(state: OverAllState): String {
