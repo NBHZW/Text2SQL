@@ -26,6 +26,7 @@ import com.zealsinger.kotlin.agent.server.nodes.PlannerNode
 import com.zealsinger.kotlin.agent.server.nodes.PythonAnalyzeNode
 import com.zealsinger.kotlin.agent.server.nodes.PythonExecuteNode
 import com.zealsinger.kotlin.agent.server.nodes.PythonGeneratorNode
+import com.zealsinger.kotlin.agent.server.nodes.ReportGeneratorNode
 import com.zealsinger.kotlin.agent.server.nodes.SchemeReCallNode
 import com.zealsinger.kotlin.agent.server.nodes.SqlExecuteNode
 import com.zealsinger.kotlin.agent.server.nodes.SqlGeneratorNode
@@ -60,6 +61,7 @@ open class GraphConfiguration {
         pythonGeneratorNode: PythonGeneratorNode,
         pythonExecuteNode: PythonExecuteNode,
         pythonAnalyzeNode: PythonAnalyzeNode,
+        reportGeneratorNode: ReportGeneratorNode,
         serializer: StateSerializer
     ): StateGraph {
         val keyStrategyFactory = KeyStrategyFactory {
@@ -103,6 +105,7 @@ open class GraphConfiguration {
             .addNode(DataAgentSpec.Graph.Node.PYTHON_GENERATION, node_async(pythonGeneratorNode))
             .addNode(DataAgentSpec.Graph.Node.PYTHON_EXECUTION, node_async(pythonExecuteNode))
             .addNode(DataAgentSpec.Graph.Node.PYTHON_ANALYSIS, node_async(pythonAnalyzeNode))
+            .addNode(DataAgentSpec.Graph.Node.REPORT_GENERATION, node_async(reportGeneratorNode))
             .addEdge(START, DataAgentSpec.Graph.Node.EVIDENCE_RECALL)
             .addEdge(DataAgentSpec.Graph.Node.EVIDENCE_RECALL, DataAgentSpec.Graph.Node.SCHEMA_RECALL)
             .addEdge(DataAgentSpec.Graph.Node.SCHEMA_RECALL, DataAgentSpec.Graph.Node.TABLE_RELATION)
@@ -129,6 +132,7 @@ open class GraphConfiguration {
                 mapOf(
                     DataAgentSpec.Graph.Node.SQL_GENERATION to DataAgentSpec.Graph.Node.SQL_GENERATION,
                     DataAgentSpec.Graph.Node.PYTHON_GENERATION to DataAgentSpec.Graph.Node.PYTHON_GENERATION,
+                    DataAgentSpec.Graph.Node.REPORT_GENERATION to DataAgentSpec.Graph.Node.REPORT_GENERATION,
                     END to END,
                 )
             )
@@ -136,7 +140,8 @@ open class GraphConfiguration {
             .addEdge(DataAgentSpec.Graph.Node.SQL_EXECUTION, DataAgentSpec.Graph.Node.PLAN_EXECUTION)
             .addEdge(DataAgentSpec.Graph.Node.PYTHON_GENERATION, DataAgentSpec.Graph.Node.PYTHON_EXECUTION)
             .addEdge(DataAgentSpec.Graph.Node.PYTHON_EXECUTION, DataAgentSpec.Graph.Node.PYTHON_ANALYSIS)
-            .addEdge(DataAgentSpec.Graph.Node.PYTHON_ANALYSIS, END)
+            .addEdge(DataAgentSpec.Graph.Node.PYTHON_ANALYSIS, DataAgentSpec.Graph.Node.PLAN_EXECUTION)
+            .addEdge(DataAgentSpec.Graph.Node.REPORT_GENERATION, END)
 
     }
 }
