@@ -17,10 +17,7 @@ private val logger = KotlinLogging.logger {}
 class FeasibilityAssessmentNode(private val chatModel: ChatModel, private val promptManager: PromptManager) : NodeAction {
     override fun apply(state: OverAllState): Map<String, Any> {
         val rewriteQuery = state.value(DataAgentSpec.Graph.StateKey.Recall.REWRITE_QUERY, "")
-        val schema = JsonUtil.fromJson(
-            state.value(DataAgentSpec.Graph.StateKey.Recall.TABLE_RELATION, String::class.java).orElseThrow {
-                RuntimeException("Unable to read Schema")
-            }, Schema::class.java)!!
+        val schema = Schema.fromState(state)
         val evidence = state.value(DataAgentSpec.Graph.StateKey.Recall.EVIDENCE, "")
         val multiTurn = state.value(DataAgentSpec.Graph.StateKey.Input.MULTI_TURN_CONTEXT, "(无)")
         val prompt = promptManager.feasibilityAssessmentPromptTemplate.render(

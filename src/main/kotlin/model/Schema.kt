@@ -1,10 +1,13 @@
 package com.zealsinger.kotlin.agent.model
 
+import com.alibaba.cloud.ai.graph.OverAllState
+import com.zealsinger.kotlin.agent.agent.DataAgentSpec
 import com.zealsinger.kotlin.agent.dataset.scheme.domain.dto.DbForeignKeySchemaView
 import com.zealsinger.kotlin.agent.dataset.scheme.domain.dto.DbTableSchemaView
 import com.zealsinger.kotlin.agent.dataset.scheme.domain.toExpression
 import com.zealsinger.kotlin.agent.datasource.SchemaDataSourceProvider
 import com.zealsinger.kotlin.agent.datasource.SqliteSchemaDataSourceProvider
+import com.zealsinger.kotlin.agent.util.JsonUtil
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.sql.Connection
 import java.sql.SQLException
@@ -16,6 +19,12 @@ data class Schema(
     val dbForeignKeys: List<DbForeignKeySchemaView>,
     val enableExampleSampling: Boolean = false
 ) {
+    companion object {
+        fun fromState(state: OverAllState): Schema {
+            val json = state.value(DataAgentSpec.Graph.StateKey.Recall.TABLE_RELATION, "")
+            return JsonUtil.fromJson<Schema>(json)!!
+        }
+    }
     fun buildSchemePrompt(
         dataSourceProvider: SchemaDataSourceProvider = SqliteSchemaDataSourceProvider
     ): String {
@@ -97,4 +106,8 @@ data class Schema(
 
     private fun quoteSqliteIdentifier(identifier: String): String =
         "`" + identifier.replace("`", "``") + "`"
+
+    fun toJson(): String {
+        return JsonUtil.toJson(this)!!
+    }
 }

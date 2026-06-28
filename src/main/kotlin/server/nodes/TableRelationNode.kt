@@ -33,7 +33,7 @@ class TableRelationNode(
     private val dbTableRepository: DbTableRepository,
     private val promptManager: PromptManager
 ) : NodeAction {
-    private val baseHighSimilarityThreshold = 0.6
+    private val baseHighSimilarityThreshold = 0.4
     private val targetTableCount = 4
 
     override fun apply(state: OverAllState): Map<String, Any> {
@@ -140,13 +140,11 @@ class TableRelationNode(
             "mix select filter tables $filterResult"
         }
         return mapOf(
-            DataAgentSpec.Graph.StateKey.Recall.TABLE_RELATION to JsonUtil.toJson(
-                Schema(
-                    databaseId,
-                    filterTables.map { DbTableSchemaView(it) },
-                    filterForeignKeys.map { DbForeignKeySchemaView(it) },
-                )
-            )!!
+            DataAgentSpec.Graph.StateKey.Recall.TABLE_RELATION to Schema(
+                databaseId,
+                filterTables.map { DbTableSchemaView(it) },
+                filterForeignKeys.map { DbForeignKeySchemaView(it) },
+            ).toJson()
         )
     }
 

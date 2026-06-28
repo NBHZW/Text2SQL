@@ -1,6 +1,7 @@
 package com.zealsinger.kotlin.agent.server.a2a
 
 import com.alibaba.cloud.ai.graph.CompileConfig
+import com.alibaba.cloud.ai.graph.CompiledGraph
 import com.alibaba.cloud.ai.graph.NodeOutput
 import com.alibaba.cloud.ai.graph.RunnableConfig
 import com.alibaba.cloud.ai.graph.StateGraph
@@ -96,7 +97,9 @@ class GraphAgentExecutor(
             )
             compiledGraph.stream(null, resumedConfig)
                 .doOnNext(::handleNodeOutput)
-                .doOnComplete(taskUpdater::complete)
+                .doOnComplete {
+                    onComplete(compiledGraph, taskUpdater, resumedConfig)
+                }
                 .blockLast()
             return
         }
@@ -114,12 +117,18 @@ class GraphAgentExecutor(
         )
         .doOnNext(::handleNodeOutput)
         .doOnComplete {
-            val stateSnapshot = compiledGraph.getState(runnableConfig)
-            if (stateSnapshot.next() == INTERRUPT_NODE) {
-                taskUpdater.requiresInput()
-            }
+            onComplete(compiledGraph, taskUpdater, runnableConfig)
         }
         .blockLast()
+    }
+
+    private fun onComplete(compiledGraph: CompiledGraph, taskUpdater: TaskUpdater, runnableConfig: RunnableConfig) {
+        val stateSnapshot = compiledGraph.getState(runnableConfig)
+        if (stateSnapshot.next() == INTERRUPT_NODE) {
+            taskUpdater.requiresInput()
+        } else {
+            taskUpdater.complete()
+        }
     }
 
     override fun cancel(

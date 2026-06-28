@@ -14,39 +14,36 @@ import org.springframework.ai.chat.model.ChatModel
 import org.springframework.ai.openai.OpenAiChatOptions
 import org.springframework.stereotype.Component
 
+
 private val logger = KotlinLogging.logger {}
 
 @Component
-class SqlGeneratorNode(private val chatModel: ChatModel, private val promptManager: PromptManager) : NodeAction {
+class PythonGeneratorNode(private val chatModel: ChatModel, private val promptManager: PromptManager) : NodeAction {
     override fun apply(state: OverAllState): Map<String, Any> {
-        val step = Plan.getCurrentStep(state)
-        val instruction = step.toolParameters.instruction ?: throw RuntimeException("sql 生成步骤 instruction为空")
+        logger.info { "apply PythonGeneratorNode" }
         val schemeDto = Schema.fromState(state)
-        val rewriteQuery = state.value(DataAgentSpec.Graph.StateKey.Recall.REWRITE_QUERY, "")
-        val evidence = state.value(DataAgentSpec.Graph.StateKey.Recall.EVIDENCE, "")
-        val dialect = "mysql"
-        val sqlPrompt = promptManager.newSqlGeneratorPromptTemplate.render(
+        val result =
+            state.value(DataAgentSpec.Graph.StateKey.Execution.SQL_EXECUTION_RESULT, SqlExecuteNode.Result::class.java).orElseThrow()
+        val executionStep = Plan.getCurrentStep(state)
+        val prompt = promptManager.pythonGeneratorPromptTemplate.render(
             mapOf(
-                "dialect" to dialect,
-                "question" to rewriteQuery,
-                "schema_info" to schemeDto.buildSchemePrompt(),
-                "evidence" to evidence,
-                "execution_description" to instruction
+                "python_memory" to "500",
+                "python_timeout" to "500",
+                "database_schema" to schemeDto.buildSchemePrompt(),
+                "sample_input" to JsonUtil.toJson(result.resultSet.data),
+                "plan_description" to JsonUtil.toJson(executionStep.toolParameters)
             )
         )
-        val sql = ChatClient.create(chatModel)
+        val pythonCode = ChatClient.create(chatModel)
             .prompt()
-            .system(sqlPrompt)
+            .system(prompt)
             .options(
                 OpenAiChatOptions.builder()
                     .extraBody(mapOf("enable_thinking" to false))
                     .build()
             )
             .call()
-            .content()!!
-        logger.info {
-            "sql $sql"
-        }
-        return mapOf(DataAgentSpec.Graph.StateKey.Execution.SQL_GENERATION_RESULT to MarkdownParserUtil.extractRawText(sql))
+            .content()
+        return mapOf(DataAgentSpec.Graph.StateKey.Execution.PYTHON_GENERATION_RESULT to MarkdownParserUtil.extractRawText(pythonCode))
     }
 }
