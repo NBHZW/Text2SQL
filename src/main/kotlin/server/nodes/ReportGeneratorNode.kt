@@ -72,6 +72,7 @@ class ReportGeneratorNode(private val chatModel: ChatModel, private val promptMa
             .user(reportPrompt)
             .stream()
             .chatResponse()
+            .filter { it.result?.output?.text != null }
     }
 
     /**
